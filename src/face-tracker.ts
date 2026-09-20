@@ -98,7 +98,7 @@ export class FaceTracker {
       const dy = to.y - from.y;
       const eyeSpan = Math.max(Math.hypot(dx, dy), 0.001);
       const viewportAspect = window.innerWidth / Math.max(window.innerHeight, 1);
-      const lift = eyeSpan * 0.95;
+      const lift = eyeSpan * 0.52;
       const forehead = {
         x: (from.x + to.x) / 2 - (dy / eyeSpan) * lift,
         y: (from.y + to.y) / 2 + (dx / eyeSpan) * lift,
