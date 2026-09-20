@@ -20,6 +20,7 @@ export class ButterflyScene {
   private readonly scene = new THREE.Scene();
   private readonly camera = new THREE.OrthographicCamera();
   private readonly butterfly = new THREE.Group();
+  private readonly flower = new THREE.Sprite();
   private readonly clock = new THREE.Clock();
   private mixer: THREE.AnimationMixer | undefined;
   private state: FlightState = 'waiting';
@@ -58,6 +59,7 @@ export class ButterflyScene {
     hasOrigin: false,
   }));
   private particleTexture: THREE.CanvasTexture | undefined;
+  private flowerTexture: THREE.Texture | undefined;
   private readonly whiteColor = new THREE.Color('#ffffff');
   private readonly mistColor = new THREE.Color('#f4f7ff');
   private readonly particleColor = new THREE.Color();
@@ -77,7 +79,11 @@ export class ButterflyScene {
     this.scene.add(new THREE.HemisphereLight(0xfff4d2, 0x29483b, 2.4));
     const keyLight = new THREE.DirectionalLight(0xffffff, 2.2);
     keyLight.position.set(-2, 3, 4);
-    this.scene.add(keyLight, this.butterfly);
+    this.scene.add(keyLight, this.butterfly, this.flower);
+    this.flower.visible = false;
+    this.flower.material.transparent = true;
+    this.flower.material.depthWrite = false;
+    this.flower.material.opacity = 0;
     this.particles = this.createParticles();
     this.particlePositions = this.particles.geometry.attributes.position.array as Float32Array;
     this.particleColors = this.particles.geometry.attributes.color.array as Float32Array;
@@ -100,9 +106,9 @@ export class ButterflyScene {
 
     model.position.copy(center).multiplyScalar(-normalization);
     model.scale.setScalar(normalization);
-    // model.rotation.y = Math.PI;
     this.butterfly.add(model);
     this.butterfly.visible = false;
+    await this.loadFlower();
 
     if (gltf.animations.length > 0) {
       this.mixer = new THREE.AnimationMixer(model);
@@ -121,6 +127,8 @@ export class ButterflyScene {
     this.hasHeading = false;
     this.previousYaw = 0;
     this.butterfly.visible = false;
+    this.flower.visible = false;
+    this.flower.material.opacity = 0;
     this.resetParticles();
   }
 
@@ -131,6 +139,7 @@ export class ButterflyScene {
 
     if (pose.visible || this.state !== 'waiting') {
       this.updateAnchor(pose);
+      this.updateFlower(pose);
       this.updateFlight(pose);
     }
     this.updateParticles(delta);
@@ -156,6 +165,8 @@ export class ButterflyScene {
     const particleMaterial = this.particles.material;
     if (particleMaterial instanceof THREE.Material) particleMaterial.dispose();
     this.particleTexture?.dispose();
+    this.flowerTexture?.dispose();
+    this.flower.material.dispose();
     this.scene.traverse((object) => {
       if (!(object instanceof THREE.Mesh)) return;
       object.geometry.dispose();
@@ -169,33 +180,58 @@ export class ButterflyScene {
   private updateAnchor(pose: FacePose): void {
     if (!pose.visible && this.state !== 'waiting') return;
     const targetX = pose.x * this.aspect;
-    const targetY = pose.y + Math.min(pose.width * 0.22, 0.16);
-    const follow = this.state === 'entering' ? 0.035 : 0.1;
+    const targetY = pose.y + Math.min(pose.width * 0.32, 0.22);
+    const follow = pose.visible ? 0.2 : 0.08;
     this.anchor.x += (targetX - this.anchor.x) * follow;
     this.anchor.y += (targetY - this.anchor.y) * follow;
   }
 
+  private async loadFlower(): Promise<void> {
+    this.flowerTexture = await new THREE.TextureLoader().loadAsync('/flower.png');
+    this.flowerTexture.colorSpace = THREE.SRGBColorSpace;
+    this.flower.material.map = this.flowerTexture;
+    this.flower.material.needsUpdate = true;
+  }
+
+  private updateFlower(pose: FacePose): void {
+    const flying = this.state !== 'waiting' && this.state !== 'done';
+    const show = flying && pose.visible;
+    this.flower.visible = flying;
+    const material = this.flower.material;
+    material.opacity += ((show ? 1 : 0) - material.opacity) * 0.18;
+    if (material.opacity < 0.02 && !show) {
+      this.flower.visible = false;
+      return;
+    }
+
+    const faceWidth = THREE.MathUtils.clamp(pose.width, 0.26, 0.85);
+    this.flower.position.set(this.anchor.x, this.anchor.y, 0.02);
+    this.flower.scale.setScalar(THREE.MathUtils.clamp(faceWidth * 0.22, 0.08, 0.16));
+    material.rotation = pose.roll * 0.55;
+  }
+
   private updateFlight(pose: FacePose): void {
     if (this.state === 'waiting') {
-      this.anchor.set(pose.x * this.aspect, pose.y);
+      this.anchor.set(pose.x * this.aspect, pose.y + Math.min(pose.width * 0.32, 0.22));
       this.transition('entering');
       this.butterfly.visible = true;
     }
 
     const progress = this.elapsed - this.stateStartedAt;
     const faceWidth = THREE.MathUtils.clamp(pose.width, 0.26, 0.85);
-    const scale = THREE.MathUtils.clamp(faceWidth * 0.42, 0.14, 0.38);
+    const scale = THREE.MathUtils.clamp(faceWidth * 0.36, 0.12, 0.32);
     const flutter = Math.sin(this.elapsed * 3.1);
+    const orbitRadius = faceWidth * 0.34;
 
     switch (this.state) {
       case 'entering': {
         const t = this.easeOutCubic(Math.min(progress / ENTER_DURATION, 1));
         const startX = (this.entryFromLeft ? -1 : 1) * (this.aspect + 0.5);
-        const endX = this.anchor.x - faceWidth * 0.7;
+        const side = this.entryFromLeft ? -1 : 1;
         this.target.set(
-          THREE.MathUtils.lerp(startX, endX, t),
-          THREE.MathUtils.lerp(this.anchor.y + 0.25, this.anchor.y + 0.02, t) +
-            Math.sin(t * Math.PI * 3) * 0.08,
+          THREE.MathUtils.lerp(startX, this.anchor.x + side * orbitRadius, t),
+          THREE.MathUtils.lerp(this.anchor.y + 0.2, this.anchor.y + 0.04, t) +
+            Math.sin(t * Math.PI * 3) * 0.05,
           0,
         );
         if (progress >= ENTER_DURATION) this.transition('orbiting');
@@ -203,27 +239,27 @@ export class ButterflyScene {
       }
       case 'orbiting': {
         const t = Math.min(progress / ORBIT_DURATION, 1);
-        const angle = t * Math.PI * 3.6 + (this.entryFromLeft ? Math.PI : 0);
+        const angle = t * Math.PI * 4.2 + (this.entryFromLeft ? Math.PI : 0);
         this.target.set(
-          this.anchor.x + Math.cos(angle) * faceWidth * 0.78,
-          this.anchor.y - 0.12 + Math.sin(angle) * faceWidth * 0.5,
-          Math.sin(angle * 0.5) * 0.25,
+          this.anchor.x + Math.cos(angle) * orbitRadius,
+          this.anchor.y + Math.sin(angle) * orbitRadius * 0.72,
+          Math.sin(angle * 0.5) * 0.12,
         );
         if (progress >= ORBIT_DURATION) this.transition('hovering');
         break;
       }
       case 'hovering': {
         this.target.set(
-          this.anchor.x + faceWidth * 0.64 + Math.sin(this.elapsed * 1.7) * 0.045,
-          this.anchor.y + flutter * 0.035 + Math.sin(this.elapsed * 0.73) * 0.02,
-          Math.sin(this.elapsed * 0.9) * 0.08,
+          this.anchor.x + orbitRadius * 0.55 + Math.sin(this.elapsed * 1.7) * 0.03,
+          this.anchor.y + 0.05 + flutter * 0.028 + Math.sin(this.elapsed * 0.73) * 0.016,
+          Math.sin(this.elapsed * 0.9) * 0.06,
         );
         if (progress >= HOVER_DURATION) this.transition('exiting');
         break;
       }
       case 'exiting': {
         const t = this.easeInCubic(Math.min(progress / EXIT_DURATION, 1));
-        const startX = this.anchor.x + faceWidth * 0.64;
+        const startX = this.anchor.x + orbitRadius * 0.55;
         const endX = (this.entryFromLeft ? 1 : -1) * (this.aspect + 0.6);
         this.target.set(
           THREE.MathUtils.lerp(startX, endX, t),
@@ -406,6 +442,8 @@ export class ButterflyScene {
   private finish(): void {
     this.state = 'done';
     this.butterfly.visible = false;
+    this.flower.visible = false;
+    this.flower.material.opacity = 0;
     if (!this.completed) {
       this.completed = true;
       this.onComplete?.();
