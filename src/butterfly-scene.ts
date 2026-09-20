@@ -71,6 +71,7 @@ export class ButterflyScene {
 
     model.position.copy(center).multiplyScalar(-normalization);
     model.scale.setScalar(normalization);
+    model.rotation.y = Math.PI;
     this.butterfly.add(model);
     this.butterfly.visible = false;
 
