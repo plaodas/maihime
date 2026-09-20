@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#10251d" />
+    <meta name="description" content="頭のまわりを舞う蝶と、ひと休みするAR体験" />
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <link rel="icon" href="/icon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <title>ひと休み蝶</title>
+  </head>
+  <body>
+    <main id="app">
+      <section id="welcome" class="panel panel--welcome">
+        <p class="eyebrow">30秒の山時間</p>
+        <h1>ひと休み蝶</h1>
+        <p class="lead">正面カメラに蝶を呼んで、週末の山を少しだけ思い出そう。</p>
+        <ul class="notes">
+          <li>映像は端末内で処理され、送信されません</li>
+          <li>明るい場所で、顔全体を画面に入れてください</li>
+        </ul>
+        <button id="start-button" class="primary-button" type="button">蝶を呼ぶ</button>
+      </section>
+
+      <section id="experience" class="experience" hidden aria-label="ARカメラ">
+        <video id="camera" playsinline muted></video>
+        <div id="scene" aria-hidden="true"></div>
+        <div class="top-bar">
+          <p id="status" role="status" aria-live="polite">準備しています…</p>
+          <button id="stop-button" class="icon-button" type="button" aria-label="体験を終了">終了</button>
+        </div>
+        <div id="result" class="result-card" hidden>
+          <p>蝶は山へ帰っていきました。</p>
+          <button id="replay-button" class="primary-button" type="button">もう一度</button>
+        </div>
+      </section>
+
+      <section id="error-panel" class="panel panel--error" hidden>
+        <p class="eyebrow">うまく起動できませんでした</p>
+        <h2 id="error-title">カメラを確認してください</h2>
+        <p id="error-message"></p>
+        <button id="retry-button" class="primary-button" type="button">やり直す</button>
+      </section>
+    </main>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
