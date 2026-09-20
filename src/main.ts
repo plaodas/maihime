@@ -134,7 +134,7 @@ function renderFrame(now: number): void {
     if (!result.hidden) {
       // Completion status takes priority.
     } else if (pose.visible) {
-      setStatus('蝶がやってきました');
+      setStatus('蝶(オグラムラサキ)がやってきました');
     } else {
       setStatus('顔を画面の中央に合わせてください');
     }

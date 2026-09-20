@@ -1,7 +1,7 @@
 {
-  "name": "ひと休み蝶",
-  "short_name": "ひと休み蝶",
-  "description": "頭のまわりを舞う蝶と、30秒だけ山を思い出すAR体験",
+  "name": "蝶の森へ",
+  "short_name": "蝶の森へ",
+  "description": "頭のまわりを舞う蝶と、30秒だけ森の景色に思いを馳せるAR体験",
   "lang": "ja",
   "start_url": "/",
   "scope": "/",
