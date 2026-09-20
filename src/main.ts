@@ -200,13 +200,17 @@ function setStatus(message: string): void {
 
 async function widenCamera(mediaStream: MediaStream): Promise<void> {
   const track = mediaStream.getVideoTracks()[0];
-  const capabilities = track?.getCapabilities?.();
-  const zoom = capabilities?.zoom;
-  if (!track || !zoom) return;
+  if (!track?.getCapabilities) return;
+
+  const capabilities = track.getCapabilities() as MediaTrackCapabilities & {
+    zoom?: { min?: number };
+  };
+  const zoom = capabilities.zoom;
+  if (!zoom) return;
 
   try {
     await track.applyConstraints({
-      advanced: [{ zoom: zoom.min ?? 1 }],
+      advanced: [{ zoom: zoom.min ?? 1 } as MediaTrackConstraintSet],
     });
   } catch {
     // Some browsers advertise zoom but reject applying it.
