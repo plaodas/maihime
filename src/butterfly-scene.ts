@@ -10,6 +10,7 @@ const ORBIT_DURATION = 6;
 const HOVER_DURATION = 13;
 const EXIT_DURATION = 2.8;
 const PARTICLE_COUNT = Math.round(140 * (isMobileDevice() ? 0.3 : 1));
+const PARTICLE_LIFE_SCALE = isMobileDevice() ? 0.5 : 1;
 
 function isMobileDevice(): boolean {
   return window.matchMedia('(pointer: coarse)').matches || /Mobi|Android|iPhone/i.test(navigator.userAgent);
@@ -304,7 +305,7 @@ export class ButterflyScene {
     stagger: boolean,
     index = 0,
   ): void {
-    particle.life = 1.2 + Math.random() * 1.1;
+    particle.life = (1.2 + Math.random() * 1.1) * PARTICLE_LIFE_SCALE;
     particle.age = stagger ? (index / PARTICLE_COUNT) * particle.life : 0;
     particle.phase = Math.random() * Math.PI * 2;
     particle.radius = 0.01 + Math.random() * 0.018;
