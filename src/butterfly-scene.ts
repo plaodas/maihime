@@ -25,7 +25,18 @@ export class ButterflyScene {
   private aspect = 1;
   private entryFromLeft = true;
   private completed = false;
-  private anchor = new THREE.Vector2();
+  private hasHeading = false;
+  private previousYaw = 0;
+  private readonly anchor = new THREE.Vector2();
+  private readonly target = new THREE.Vector3();
+  private readonly previousPosition = new THREE.Vector3();
+  private readonly velocity = new THREE.Vector3();
+  private readonly lookTarget = new THREE.Vector3();
+  private readonly worldUp = new THREE.Vector3(0, 1, 0);
+  private readonly lookMatrix = new THREE.Matrix4();
+  private readonly desiredQuaternion = new THREE.Quaternion();
+  private readonly bankQuaternion = new THREE.Quaternion();
+  private readonly bankAxis = new THREE.Vector3(0, 0, 1);
 
   constructor(container: HTMLElement) {
     this.renderer = new THREE.WebGLRenderer({
@@ -60,7 +71,6 @@ export class ButterflyScene {
 
     model.position.copy(center).multiplyScalar(-normalization);
     model.scale.setScalar(normalization);
-    model.rotation.x = Math.PI * 0.42;
     model.rotation.y = Math.PI;
     this.butterfly.add(model);
     this.butterfly.visible = false;
@@ -79,6 +89,8 @@ export class ButterflyScene {
     this.stateStartedAt = this.elapsed;
     this.entryFromLeft = Math.random() > 0.5;
     this.completed = false;
+    this.hasHeading = false;
+    this.previousYaw = 0;
     this.butterfly.visible = false;
   }
 
@@ -139,14 +151,13 @@ export class ButterflyScene {
     const faceWidth = THREE.MathUtils.clamp(pose.width, 0.26, 0.85);
     const scale = THREE.MathUtils.clamp(faceWidth * 0.42, 0.14, 0.38);
     const flutter = Math.sin(this.elapsed * 3.1);
-    const target = new THREE.Vector3();
 
     switch (this.state) {
       case 'entering': {
         const t = this.easeOutCubic(Math.min(progress / ENTER_DURATION, 1));
         const startX = (this.entryFromLeft ? -1 : 1) * (this.aspect + 0.5);
         const endX = this.anchor.x - faceWidth * 0.7;
-        target.set(
+        this.target.set(
           THREE.MathUtils.lerp(startX, endX, t),
           THREE.MathUtils.lerp(this.anchor.y + 0.25, this.anchor.y + 0.02, t) +
             Math.sin(t * Math.PI * 3) * 0.08,
@@ -158,7 +169,7 @@ export class ButterflyScene {
       case 'orbiting': {
         const t = Math.min(progress / ORBIT_DURATION, 1);
         const angle = t * Math.PI * 3.6 + (this.entryFromLeft ? Math.PI : 0);
-        target.set(
+        this.target.set(
           this.anchor.x + Math.cos(angle) * faceWidth * 0.78,
           this.anchor.y - 0.12 + Math.sin(angle) * faceWidth * 0.5,
           Math.sin(angle * 0.5) * 0.25,
@@ -167,7 +178,7 @@ export class ButterflyScene {
         break;
       }
       case 'hovering': {
-        target.set(
+        this.target.set(
           this.anchor.x + faceWidth * 0.64 + Math.sin(this.elapsed * 1.7) * 0.045,
           this.anchor.y + flutter * 0.035 + Math.sin(this.elapsed * 0.73) * 0.02,
           Math.sin(this.elapsed * 0.9) * 0.08,
@@ -179,7 +190,7 @@ export class ButterflyScene {
         const t = this.easeInCubic(Math.min(progress / EXIT_DURATION, 1));
         const startX = this.anchor.x + faceWidth * 0.64;
         const endX = (this.entryFromLeft ? 1 : -1) * (this.aspect + 0.6);
-        target.set(
+        this.target.set(
           THREE.MathUtils.lerp(startX, endX, t),
           this.anchor.y + t * 0.45 + Math.sin(t * Math.PI * 2) * 0.06,
           -t * 0.5,
@@ -192,10 +203,40 @@ export class ButterflyScene {
         return;
     }
 
-    this.butterfly.position.copy(target);
+    if (this.hasHeading) {
+      this.velocity.subVectors(this.target, this.previousPosition);
+    } else {
+      this.velocity.set(this.entryFromLeft ? 1 : -1, 0.08, 0);
+    }
+    this.previousPosition.copy(this.target);
+
+    this.butterfly.position.copy(this.target);
     this.butterfly.scale.setScalar(scale * (1 + flutter * 0.025));
-    this.butterfly.rotation.z = pose.roll * 0.45 + Math.sin(this.elapsed * 1.2) * 0.1;
-    this.butterfly.rotation.y = Math.sin(this.elapsed * 0.8) * 0.18;
+    this.orientToVelocity();
+  }
+
+  private orientToVelocity(): void {
+    if (this.velocity.lengthSq() < 1e-8) return;
+
+    this.lookTarget.copy(this.butterfly.position).add(this.velocity);
+    this.lookMatrix.lookAt(this.lookTarget, this.butterfly.position, this.worldUp);
+    this.desiredQuaternion.setFromRotationMatrix(this.lookMatrix);
+
+    const yaw = Math.atan2(this.velocity.x, -this.velocity.z);
+    const yawDelta = Math.atan2(Math.sin(yaw - this.previousYaw), Math.cos(yaw - this.previousYaw));
+    this.previousYaw = yaw;
+    const bank = THREE.MathUtils.clamp(-yawDelta * 10, -0.55, 0.55);
+    this.bankQuaternion.setFromAxisAngle(this.bankAxis, bank);
+    this.desiredQuaternion.multiply(this.bankQuaternion);
+
+    if (!this.hasHeading) {
+      this.butterfly.quaternion.copy(this.desiredQuaternion);
+      this.hasHeading = true;
+      return;
+    }
+
+    const follow = this.state === 'hovering' ? 0.1 : 0.2;
+    this.butterfly.quaternion.slerp(this.desiredQuaternion, follow);
   }
 
   private transition(next: FlightState): void {
