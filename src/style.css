@@ -122,8 +122,9 @@ h2 {
 }
 
 #camera {
-  object-fit: cover;
+  object-fit: contain;
   transform: scaleX(-1);
+  background: #07100d;
 }
 
 .forest-frame {

@@ -169,7 +169,7 @@ export class ButterflyScene {
   private updateAnchor(pose: FacePose): void {
     if (!pose.visible && this.state !== 'waiting') return;
     const targetX = pose.x * this.aspect;
-    const targetY = pose.y + Math.min(pose.width * 0.18, 0.12);
+    const targetY = pose.y + Math.min(pose.width * 0.22, 0.16);
     const follow = this.state === 'entering' ? 0.035 : 0.1;
     this.anchor.x += (targetX - this.anchor.x) * follow;
     this.anchor.y += (targetY - this.anchor.y) * follow;

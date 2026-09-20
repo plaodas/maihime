@@ -207,9 +207,9 @@ async function openCamera(): Promise<MediaStream> {
       audio: false,
       video: {
         ...facing,
-        width: { ideal: 480, max: 640 },
-        height: { ideal: 640, max: 720 },
-        frameRate: { ideal: 24, max: 24 },
+        width: { ideal: 1280 },
+        height: { ideal: 720 },
+        frameRate: { ideal: 24, max: 30 },
       },
     });
   } catch (error) {
@@ -235,7 +235,11 @@ async function widenCamera(mediaStream: MediaStream): Promise<void> {
       advanced: [{ zoom: zoom.min ?? 1 } as MediaTrackConstraintSet],
     });
   } catch {
-    // Some browsers advertise zoom but reject applying it.
+    try {
+      await track.applyConstraints({ zoom: zoom.min ?? 1 } as MediaTrackConstraintSet);
+    } catch {
+      // Some browsers advertise zoom but reject applying it.
+    }
   }
 }
 

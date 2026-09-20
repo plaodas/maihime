@@ -96,11 +96,12 @@ export class FaceTracker {
       const [from, to] = left.x < right.x ? [left, right] : [right, left];
       const dx = to.x - from.x;
       const dy = to.y - from.y;
-      const eyeSpan = Math.hypot(dx, dy);
+      const eyeSpan = Math.max(Math.hypot(dx, dy), 0.001);
       const viewportAspect = window.innerWidth / Math.max(window.innerHeight, 1);
+      const lift = eyeSpan * 0.95;
       const forehead = {
-        x: (from.x + to.x) / 2 + dy * 0.55,
-        y: (from.y + to.y) / 2 - dx * 0.55,
+        x: (from.x + to.x) / 2 - (dy / eyeSpan) * lift,
+        y: (from.y + to.y) / 2 + (dx / eyeSpan) * lift,
       };
 
       return {
@@ -156,13 +157,13 @@ export class FaceTracker {
     const viewportHeight = window.innerHeight;
     const sourceWidth = video.videoWidth || viewportWidth;
     const sourceHeight = video.videoHeight || viewportHeight;
-    const coverScale = Math.max(viewportWidth / sourceWidth, viewportHeight / sourceHeight);
-    const displayedWidth = sourceWidth * coverScale;
-    const displayedHeight = sourceHeight * coverScale;
-    const cropX = (displayedWidth - viewportWidth) / 2;
-    const cropY = (displayedHeight - viewportHeight) / 2;
-    const pixelX = (1 - landmark.x) * displayedWidth - cropX;
-    const pixelY = landmark.y * displayedHeight - cropY;
+    const fitScale = Math.min(viewportWidth / sourceWidth, viewportHeight / sourceHeight);
+    const displayedWidth = sourceWidth * fitScale;
+    const displayedHeight = sourceHeight * fitScale;
+    const offsetX = (viewportWidth - displayedWidth) / 2;
+    const offsetY = (viewportHeight - displayedHeight) / 2;
+    const pixelX = (1 - landmark.x) * displayedWidth + offsetX;
+    const pixelY = landmark.y * displayedHeight + offsetY;
 
     return {
       x: (pixelX / viewportWidth) * 2 - 1,
