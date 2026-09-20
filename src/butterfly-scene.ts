@@ -9,6 +9,7 @@ const ENTER_DURATION = 2.6;
 const ORBIT_DURATION = 6;
 const HOVER_DURATION = 13;
 const EXIT_DURATION = 2.8;
+const PARTICLE_COUNT = 140;
 
 export class ButterflyScene {
   readonly renderer: THREE.WebGLRenderer;
@@ -37,6 +38,28 @@ export class ButterflyScene {
   private readonly desiredQuaternion = new THREE.Quaternion();
   private readonly bankQuaternion = new THREE.Quaternion();
   private readonly bankAxis = new THREE.Vector3(0, 0, 1);
+  private readonly particles: THREE.Points;
+  private readonly particlePositions: Float32Array;
+  private readonly particleColors: Float32Array;
+  private readonly particleStates = Array.from({ length: PARTICLE_COUNT }, () => ({
+    age: 0,
+    life: 1.6,
+    phase: 0,
+    radius: 0.02,
+    speed: 0.12,
+    spin: 2.4,
+    hue: 0,
+    side: 1,
+    originX: 0,
+    originY: 0,
+    originZ: 0,
+    hasOrigin: false,
+  }));
+  private particleTexture: THREE.CanvasTexture | undefined;
+  private readonly whiteColor = new THREE.Color('#ffffff');
+  private readonly mistColor = new THREE.Color('#f4f7ff');
+  private readonly particleColor = new THREE.Color();
+  private readonly wingWorld = new THREE.Vector3();
 
   constructor(container: HTMLElement) {
     this.renderer = new THREE.WebGLRenderer({
@@ -53,6 +76,10 @@ export class ButterflyScene {
     const keyLight = new THREE.DirectionalLight(0xffffff, 2.2);
     keyLight.position.set(-2, 3, 4);
     this.scene.add(keyLight, this.butterfly);
+    this.particles = this.createParticles();
+    this.particlePositions = this.particles.geometry.attributes.position.array as Float32Array;
+    this.particleColors = this.particles.geometry.attributes.color.array as Float32Array;
+    this.scene.add(this.particles);
 
     this.camera.position.z = 5;
     this.camera.near = 0.1;
@@ -92,6 +119,7 @@ export class ButterflyScene {
     this.hasHeading = false;
     this.previousYaw = 0;
     this.butterfly.visible = false;
+    this.resetParticles();
   }
 
   update(pose: FacePose): void {
@@ -103,6 +131,7 @@ export class ButterflyScene {
       this.updateAnchor(pose);
       this.updateFlight(pose);
     }
+    this.updateParticles(delta);
 
     this.renderer.render(this.scene, this.camera);
   }
@@ -121,6 +150,10 @@ export class ButterflyScene {
 
   dispose(): void {
     this.mixer?.stopAllAction();
+    this.particles.geometry.dispose();
+    const particleMaterial = this.particles.material;
+    if (particleMaterial instanceof THREE.Material) particleMaterial.dispose();
+    this.particleTexture?.dispose();
     this.scene.traverse((object) => {
       if (!(object instanceof THREE.Mesh)) return;
       object.geometry.dispose();
@@ -213,6 +246,130 @@ export class ButterflyScene {
     this.butterfly.position.copy(this.target);
     this.butterfly.scale.setScalar(scale * (1 + flutter * 0.025));
     this.orientToVelocity();
+  }
+
+  private createParticles(): THREE.Points {
+    const geometry = new THREE.BufferGeometry();
+    const positions = new Float32Array(PARTICLE_COUNT * 3);
+    const colors = new Float32Array(PARTICLE_COUNT * 3);
+    geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+    geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+    this.particleTexture = this.createParticleTexture();
+    const material = new THREE.PointsMaterial({
+      map: this.particleTexture,
+      vertexColors: true,
+      transparent: true,
+      depthWrite: false,
+      blending: THREE.AdditiveBlending,
+      size: 4.6,
+      sizeAttenuation: false,
+    });
+    const points = new THREE.Points(geometry, material);
+    points.frustumCulled = false;
+    points.visible = false;
+    this.resetParticles();
+    return points;
+  }
+
+  private createParticleTexture(): THREE.CanvasTexture {
+    const canvas = document.createElement('canvas');
+    canvas.width = 64;
+    canvas.height = 64;
+    const context = canvas.getContext('2d');
+    if (!context) return new THREE.CanvasTexture(canvas);
+
+    const gradient = context.createRadialGradient(32, 32, 1, 32, 32, 16);
+    gradient.addColorStop(0, 'rgba(255, 255, 255, 1)');
+    gradient.addColorStop(0.45, 'rgba(255, 255, 255, 0.7)');
+    gradient.addColorStop(1, 'rgba(255, 255, 255, 0)');
+    context.fillStyle = gradient;
+    context.fillRect(0, 0, 64, 64);
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.colorSpace = THREE.SRGBColorSpace;
+    return texture;
+  }
+
+  private resetParticles(): void {
+    this.particleStates.forEach((particle, index) => {
+      this.seedParticle(particle, true, index);
+    });
+  }
+
+  private seedParticle(
+    particle: (typeof this.particleStates)[number],
+    stagger: boolean,
+    index = 0,
+  ): void {
+    particle.life = 1.2 + Math.random() * 1.1;
+    particle.age = stagger ? (index / PARTICLE_COUNT) * particle.life : 0;
+    particle.phase = Math.random() * Math.PI * 2;
+    particle.radius = 0.01 + Math.random() * 0.018;
+    particle.speed = 0.07 + Math.random() * 0.06;
+    particle.spin = (Math.random() > 0.5 ? 1 : -1) * (2.2 + Math.random() * 2.6);
+    particle.hue = Math.random();
+    particle.side = Math.random() > 0.5 ? -1 : 1;
+    if (this.butterfly.visible) {
+      this.captureWingOrigin(particle);
+    } else {
+      particle.hasOrigin = false;
+    }
+  }
+
+  private captureWingOrigin(particle: (typeof this.particleStates)[number]): void {
+    this.butterfly.updateMatrixWorld();
+    this.wingWorld.set(
+      particle.side * (0.3 + Math.random() * 0.16),
+      -0.14 - Math.random() * 0.1,
+      (Math.random() - 0.5) * 0.08,
+    );
+    this.butterfly.localToWorld(this.wingWorld);
+    particle.originX = this.wingWorld.x;
+    particle.originY = this.wingWorld.y;
+    particle.originZ = this.wingWorld.z;
+    particle.hasOrigin = true;
+  }
+
+  private updateParticles(delta: number): void {
+    const flying = this.state !== 'waiting' && this.state !== 'done';
+    this.particles.visible =
+      flying || this.particleStates.some((particle) => particle.age < particle.life);
+
+    if (!this.particles.visible) return;
+
+    this.particleStates.forEach((particle, index) => {
+      particle.age += delta;
+      if (particle.age >= particle.life) {
+        if (!flying) {
+          this.particleColors[index * 3] = 0;
+          this.particleColors[index * 3 + 1] = 0;
+          this.particleColors[index * 3 + 2] = 0;
+          return;
+        }
+        this.seedParticle(particle, false);
+      }
+
+      if (flying && this.butterfly.visible && !particle.hasOrigin) {
+        this.captureWingOrigin(particle);
+      }
+
+      const t = THREE.MathUtils.clamp(particle.age / particle.life, 0, 1);
+      const fade = t < 0.08 ? t / 0.08 : t > 0.72 ? (1 - t) / 0.28 : 1;
+      const angle = particle.phase + particle.age * particle.spin;
+      const spiral = particle.radius * t * (1.2 + t);
+      const i = index * 3;
+      this.particlePositions[i] = particle.originX + Math.cos(angle) * spiral;
+      this.particlePositions[i + 1] = particle.originY - particle.age * particle.speed;
+      this.particlePositions[i + 2] = particle.originZ + Math.sin(angle) * spiral * 0.6;
+
+      this.particleColor.copy(this.whiteColor).lerp(this.mistColor, particle.hue);
+      const brightness = fade * (flying ? 0.8 : 0.28);
+      this.particleColors[i] = this.particleColor.r * brightness;
+      this.particleColors[i + 1] = this.particleColor.g * brightness;
+      this.particleColors[i + 2] = this.particleColor.b * brightness;
+    });
+
+    this.particles.geometry.attributes.position.needsUpdate = true;
+    this.particles.geometry.attributes.color.needsUpdate = true;
   }
 
   private orientToVelocity(): void {
