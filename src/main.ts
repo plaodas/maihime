@@ -84,11 +84,10 @@ async function startSession(): Promise<void> {
       audio: false,
       video: {
         facingMode: { ideal: 'user' },
-        width: { ideal: 720 },
-        height: { ideal: 1280 },
         frameRate: { ideal: 30, max: 30 },
       },
     });
+    await widenCamera(stream);
 
     if (currentSession !== sessionId) {
       stream.getTracks().forEach((track) => track.stop());
@@ -197,6 +196,21 @@ function setStatus(message: string): void {
   if (message === lastStatus) return;
   lastStatus = message;
   status.textContent = message;
+}
+
+async function widenCamera(mediaStream: MediaStream): Promise<void> {
+  const track = mediaStream.getVideoTracks()[0];
+  const capabilities = track?.getCapabilities?.();
+  const zoom = capabilities?.zoom;
+  if (!track || !zoom) return;
+
+  try {
+    await track.applyConstraints({
+      advanced: [{ zoom: zoom.min ?? 1 }],
+    });
+  } catch {
+    // Some browsers advertise zoom but reject applying it.
+  }
 }
 
 function describeError(error: unknown): { title: string; detail: string } {
