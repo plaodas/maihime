@@ -9,7 +9,11 @@ const ENTER_DURATION = 2.6;
 const ORBIT_DURATION = 6;
 const HOVER_DURATION = 13;
 const EXIT_DURATION = 2.8;
-const PARTICLE_COUNT = 140;
+const PARTICLE_COUNT = Math.round(140 * (isMobileDevice() ? 0.3 : 1));
+
+function isMobileDevice(): boolean {
+  return window.matchMedia('(pointer: coarse)').matches || /Mobi|Android|iPhone/i.test(navigator.userAgent);
+}
 
 export class ButterflyScene {
   readonly renderer: THREE.WebGLRenderer;
