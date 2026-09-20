@@ -31,5 +31,5 @@ npm run preview
 ## 主な構成
 
 - Three.js: GLBモデルの表示と羽ばたきアニメーション
-- MediaPipe Face Landmarker: 顔位置・幅・傾きの推定
+- MediaPipe Face Detector: 顔位置・幅・傾きの推定
 - Vite PWA: Service Workerとオフラインキャッシュ

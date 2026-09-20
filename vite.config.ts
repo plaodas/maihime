@@ -5,10 +5,10 @@ export default defineConfig({
   plugins: [
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['icon.svg', 'models/face_landmarker.task'],
+      includeAssets: ['icon.svg', 'models/blaze_face_short_range.tflite'],
       manifest: false,
       workbox: {
-        globPatterns: ['**/*.{js,css,html,svg,png,webmanifest,glb,task}'],
+        globPatterns: ['**/*.{js,css,html,svg,png,webmanifest,glb,task,tflite}'],
         maximumFileSizeToCacheInBytes: 10 * 1024 * 1024,
         runtimeCaching: [
           {

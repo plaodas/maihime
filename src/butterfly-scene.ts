@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import butterflyUrl from '../butterfly.glb?url';
+import { isMobileDevice } from './device';
 import type { FacePose } from './face-tracker';
 
 type FlightState = 'waiting' | 'entering' | 'orbiting' | 'hovering' | 'exiting' | 'done';
@@ -11,10 +12,6 @@ const HOVER_DURATION = 13;
 const EXIT_DURATION = 2.8;
 const PARTICLE_COUNT = Math.round(140 * (isMobileDevice() ? 0.3 : 1));
 const PARTICLE_LIFE_SCALE = isMobileDevice() ? 0.5 : 1;
-
-function isMobileDevice(): boolean {
-  return window.matchMedia('(pointer: coarse)').matches || /Mobi|Android|iPhone/i.test(navigator.userAgent);
-}
 
 export class ButterflyScene {
   readonly renderer: THREE.WebGLRenderer;
@@ -69,11 +66,11 @@ export class ButterflyScene {
   constructor(container: HTMLElement) {
     this.renderer = new THREE.WebGLRenderer({
       alpha: true,
-      antialias: true,
+      antialias: !isMobileDevice(),
       powerPreference: 'high-performance',
     });
     this.renderer.setClearColor(0x000000, 0);
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.75));
+    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, isMobileDevice() ? 1.25 : 1.75));
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     container.append(this.renderer.domElement);
 

@@ -1,5 +1,6 @@
 import './style.css';
 import { ButterflyScene } from './butterfly-scene';
+import { isMobileDevice } from './device';
 import { FaceTracker } from './face-tracker';
 
 const requireElement = <T extends HTMLElement>(selector: string): T => {
@@ -80,13 +81,7 @@ async function startSession(): Promise<void> {
       setStatus('ひと休み、おつかれさまでした');
     };
 
-    stream = await navigator.mediaDevices.getUserMedia({
-      audio: false,
-      video: {
-        facingMode: { ideal: 'user' },
-        frameRate: { ideal: 30, max: 30 },
-      },
-    });
+    stream = await openCamera();
     await widenCamera(stream);
 
     if (currentSession !== sessionId) {
@@ -196,6 +191,33 @@ function setStatus(message: string): void {
   if (message === lastStatus) return;
   lastStatus = message;
   status.textContent = message;
+}
+
+async function openCamera(): Promise<MediaStream> {
+  const facing = { facingMode: { ideal: 'user' as const } };
+  if (!isMobileDevice()) {
+    return navigator.mediaDevices.getUserMedia({
+      audio: false,
+      video: { ...facing, frameRate: { ideal: 30, max: 30 } },
+    });
+  }
+
+  try {
+    return await navigator.mediaDevices.getUserMedia({
+      audio: false,
+      video: {
+        ...facing,
+        width: { ideal: 480, max: 640 },
+        height: { ideal: 640, max: 720 },
+        frameRate: { ideal: 24, max: 24 },
+      },
+    });
+  } catch (error) {
+    if (error instanceof DOMException && error.name === 'OverconstrainedError') {
+      return navigator.mediaDevices.getUserMedia({ audio: false, video: facing });
+    }
+    throw error;
+  }
 }
 
 async function widenCamera(mediaStream: MediaStream): Promise<void> {

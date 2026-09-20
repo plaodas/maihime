@@ -1,8 +1,5 @@
-import {
-  FaceLandmarker,
-  FilesetResolver,
-  type NormalizedLandmark,
-} from '@mediapipe/tasks-vision';
+import { FaceDetector, FilesetResolver, type Detection } from '@mediapipe/tasks-vision';
+import { isMobileDevice } from './device';
 
 export interface FacePose {
   x: number;
@@ -12,11 +9,8 @@ export interface FacePose {
   visible: boolean;
 }
 
-const FOREHEAD = 10;
-const LEFT_CHEEK = 234;
-const RIGHT_CHEEK = 454;
-const INFERENCE_INTERVAL_MS = 1000 / 15;
-const SMOOTHING = 0.22;
+const INFERENCE_INTERVAL_MS = 1000 / (isMobileDevice() ? 8 : 12);
+const SMOOTHING = isMobileDevice() ? 0.28 : 0.22;
 
 const EMPTY_POSE: FacePose = {
   x: 0,
@@ -27,36 +21,34 @@ const EMPTY_POSE: FacePose = {
 };
 
 export class FaceTracker {
-  private readonly landmarker: FaceLandmarker;
+  private readonly detector: FaceDetector;
   private pose: FacePose = { ...EMPTY_POSE };
   private lastInferenceAt = -Infinity;
 
-  private constructor(landmarker: FaceLandmarker) {
-    this.landmarker = landmarker;
+  private constructor(detector: FaceDetector) {
+    this.detector = detector;
   }
 
   static async create(): Promise<FaceTracker> {
     const vision = await FilesetResolver.forVisionTasks('/wasm');
     const options = {
-      baseOptions: { modelAssetPath: '/models/face_landmarker.task' },
-      runningMode: 'VIDEO',
-      numFaces: 1,
-      minFaceDetectionConfidence: 0.55,
-      minFacePresenceConfidence: 0.55,
-      minTrackingConfidence: 0.5,
-    } as const;
+      baseOptions: { modelAssetPath: '/models/blaze_face_short_range.tflite' },
+      runningMode: 'VIDEO' as const,
+      minDetectionConfidence: 0.5,
+      minSuppressionThreshold: 0.3,
+    };
 
-    let landmarker: FaceLandmarker;
+    let detector: FaceDetector;
     try {
-      landmarker = await FaceLandmarker.createFromOptions(vision, {
+      detector = await FaceDetector.createFromOptions(vision, {
         ...options,
         baseOptions: { ...options.baseOptions, delegate: 'GPU' },
       });
     } catch {
-      landmarker = await FaceLandmarker.createFromOptions(vision, options);
+      detector = await FaceDetector.createFromOptions(vision, options);
     }
 
-    return new FaceTracker(landmarker);
+    return new FaceTracker(detector);
   }
 
   update(video: HTMLVideoElement, now: number): FacePose {
@@ -68,14 +60,14 @@ export class FaceTracker {
     }
 
     this.lastInferenceAt = now;
-    const landmarks = this.landmarker.detectForVideo(video, now).faceLandmarks[0];
+    const detection = this.detector.detectForVideo(video, now).detections[0];
 
-    if (!landmarks) {
+    if (!detection) {
       this.pose = { ...this.pose, visible: false };
       return this.pose;
     }
 
-    const next = this.toPose(landmarks, video);
+    const next = this.toPose(detection, video);
     this.pose = this.pose.visible
       ? {
           x: this.lerp(this.pose.x, next.x),
@@ -90,29 +82,74 @@ export class FaceTracker {
   }
 
   close(): void {
-    this.landmarker.close();
+    this.detector.close();
   }
 
-  private toPose(landmarks: NormalizedLandmark[], video: HTMLVideoElement): FacePose {
-    const forehead = this.project(landmarks[FOREHEAD], video);
-    const cheekA = this.project(landmarks[LEFT_CHEEK], video);
-    const cheekB = this.project(landmarks[RIGHT_CHEEK], video);
-    const [left, right] = cheekA.x < cheekB.x ? [cheekA, cheekB] : [cheekB, cheekA];
-    const dx = right.x - left.x;
-    const dy = right.y - left.y;
-    const viewportAspect = window.innerWidth / Math.max(window.innerHeight, 1);
+  private toPose(detection: Detection, video: HTMLVideoElement): FacePose {
+    const leftEye = this.keypoint(detection, ['leftEye', 'left_eye'], 1);
+    const rightEye = this.keypoint(detection, ['rightEye', 'right_eye'], 0);
+    const box = detection.boundingBox;
 
+    if (leftEye && rightEye) {
+      const left = this.project(leftEye, video);
+      const right = this.project(rightEye, video);
+      const [from, to] = left.x < right.x ? [left, right] : [right, left];
+      const dx = to.x - from.x;
+      const dy = to.y - from.y;
+      const eyeSpan = Math.hypot(dx, dy);
+      const viewportAspect = window.innerWidth / Math.max(window.innerHeight, 1);
+      const forehead = {
+        x: (from.x + to.x) / 2 + dy * 0.55,
+        y: (from.y + to.y) / 2 - dx * 0.55,
+      };
+
+      return {
+        x: forehead.x,
+        y: forehead.y,
+        width: Math.max(eyeSpan * viewportAspect * 2.1, box ? this.boxWidth(box, video) : eyeSpan),
+        roll: Math.atan2(dy, dx * viewportAspect),
+        visible: true,
+      };
+    }
+
+    if (!box) return { ...EMPTY_POSE };
+
+    const mid = this.project(
+      {
+        x: (box.originX + box.width / 2) / (video.videoWidth || 1),
+        y: box.originY / (video.videoHeight || 1),
+      },
+      video,
+    );
     return {
-      x: forehead.x,
-      y: forehead.y,
-      width: Math.hypot(dx * viewportAspect, dy),
-      roll: Math.atan2(dy, dx * viewportAspect),
+      x: mid.x,
+      y: mid.y,
+      width: this.boxWidth(box, video),
+      roll: 0,
       visible: true,
     };
   }
 
+  private boxWidth(
+    box: { originX: number; width: number },
+    video: HTMLVideoElement,
+  ): number {
+    const sourceWidth = video.videoWidth || window.innerWidth;
+    const viewportAspect = window.innerWidth / Math.max(window.innerHeight, 1);
+    return (box.width / sourceWidth) * 2 * viewportAspect;
+  }
+
+  private keypoint(
+    detection: Detection,
+    names: string[],
+    fallbackIndex: number,
+  ): Detection['keypoints'][number] | undefined {
+    const named = detection.keypoints.find((point) => point.label && names.includes(point.label));
+    return named ?? detection.keypoints[fallbackIndex];
+  }
+
   private project(
-    landmark: NormalizedLandmark,
+    landmark: { x: number; y: number },
     video: HTMLVideoElement,
   ): { x: number; y: number } {
     const viewportWidth = window.innerWidth;
