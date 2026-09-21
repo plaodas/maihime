@@ -227,7 +227,7 @@ export class ButterflyScene {
 
     const progress = this.elapsed - this.stateStartedAt;
     const faceWidth = THREE.MathUtils.clamp(pose.width, 0.56, 1.25);
-    const scale = THREE.MathUtils.clamp(faceWidth * 0.22, 0.12, 0.32);
+    const scale = THREE.MathUtils.clamp(faceWidth * 0.28, 0.12, 0.32);
     const flutter = Math.sin(this.elapsed * 3.1);
     const orbitRadius = faceWidth * 0.34;
 
