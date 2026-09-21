@@ -6,9 +6,9 @@ import type { FacePose } from './face-tracker';
 
 type FlightState = 'waiting' | 'entering' | 'orbiting' | 'hovering' | 'exiting' | 'done';
 
-const ENTER_DURATION = 2.6;
-const ORBIT_DURATION = 6;
-const HOVER_DURATION = 13;
+const ENTER_DURATION = 5;
+const ORBIT_DURATION = 9;
+const HOVER_DURATION = 6;
 const EXIT_DURATION = 2.8;
 const PARTICLE_COUNT = Math.round(140 * (isMobileDevice() ? 0.3 : 1));
 const PARTICLE_LIFE_SCALE = isMobileDevice() ? 0.5 : 1;
@@ -226,8 +226,8 @@ export class ButterflyScene {
     }
 
     const progress = this.elapsed - this.stateStartedAt;
-    const faceWidth = THREE.MathUtils.clamp(pose.width, 0.26, 0.85);
-    const scale = THREE.MathUtils.clamp(faceWidth * 0.36, 0.12, 0.32);
+    const faceWidth = THREE.MathUtils.clamp(pose.width, 0.56, 1.25);
+    const scale = THREE.MathUtils.clamp(faceWidth * 0.16, 0.12, 0.32);
     const flutter = Math.sin(this.elapsed * 3.1);
     const orbitRadius = faceWidth * 0.34;
 
