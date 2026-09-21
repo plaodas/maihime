@@ -181,7 +181,7 @@ export class ButterflyScene {
   private updateAnchor(pose: FacePose): void {
     if (!pose.visible && this.state !== 'waiting') return;
     const targetX = pose.x * this.aspect;
-    const targetY = pose.y + Math.min(pose.width * 0.04, 0.03);
+    const targetY = pose.y + Math.min(pose.width * 0.1, 0.07);
     const follow = pose.visible ? 0.2 : 0.08;
     this.anchor.x += (targetX - this.anchor.x) * follow;
     this.anchor.y += (targetY - this.anchor.y) * follow;
@@ -190,12 +190,15 @@ export class ButterflyScene {
   private async loadFlower(): Promise<void> {
     this.flowerTexture = await new THREE.TextureLoader().loadAsync('/flower.png');
     this.flowerTexture.colorSpace = THREE.SRGBColorSpace;
-    this.flowerTexture.premultiplyAlpha = true;
-    this.flower.material.map = this.flowerTexture;
-    this.flower.material.transparent = true;
-    this.flower.material.alphaTest = 0.12;
-    this.flower.material.premultipliedAlpha = true;
-    this.flower.material.needsUpdate = true;
+    this.flower.material.dispose();
+    this.flower.material = new THREE.SpriteMaterial({
+      map: this.flowerTexture,
+      color: 0xffffff,
+      transparent: true,
+      alphaTest: 0.2,
+      depthWrite: false,
+      opacity: 0,
+    });
   }
 
   private updateFlower(pose: FacePose): void {
@@ -217,7 +220,7 @@ export class ButterflyScene {
 
   private updateFlight(pose: FacePose): void {
     if (this.state === 'waiting') {
-      this.anchor.set(pose.x * this.aspect, pose.y + Math.min(pose.width * 0.04, 0.03));
+      this.anchor.set(pose.x * this.aspect, pose.y + Math.min(pose.width * 0.1, 0.07));
       this.transition('entering');
       this.butterfly.visible = true;
     }
