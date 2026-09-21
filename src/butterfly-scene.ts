@@ -7,8 +7,8 @@ import type { FacePose } from './face-tracker';
 type FlightState = 'waiting' | 'entering' | 'orbiting' | 'hovering' | 'exiting' | 'done';
 
 const ENTER_DURATION = 5;
-const ORBIT_DURATION = 9;
-const HOVER_DURATION = 6;
+const ORBIT_DURATION = 15.2;
+const HOVER_DURATION = 8;
 const EXIT_DURATION = 2.8;
 const PARTICLE_COUNT = Math.round(140 * (isMobileDevice() ? 0.3 : 1));
 const PARTICLE_LIFE_SCALE = isMobileDevice() ? 0.5 : 1;
