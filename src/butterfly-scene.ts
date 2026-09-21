@@ -182,7 +182,7 @@ export class ButterflyScene {
     if (!pose.visible && this.state !== 'waiting') return;
     const targetX = pose.x * this.aspect;
     const targetY = pose.y + Math.min(pose.width * 0.1, 0.07);
-    const follow = pose.visible ? 0.2 : 0.08;
+    const follow = pose.visible ? 0.45 : 0.12;
     this.anchor.x += (targetX - this.anchor.x) * follow;
     this.anchor.y += (targetY - this.anchor.y) * follow;
   }
