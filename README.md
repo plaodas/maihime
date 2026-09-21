@@ -33,3 +33,7 @@ npm run preview
 - Three.js: GLBモデルの表示と羽ばたきアニメーション
 - MediaPipe Face Detector: 顔位置・幅・傾きの推定
 - Vite PWA: Service Workerとオフラインキャッシュ
+
+## ライセンス
+
+MIT License
