@@ -34,6 +34,21 @@ npm run preview
 - MediaPipe Face Detector: 顔位置・幅・傾きの推定
 - Vite PWA: Service Workerとオフラインキャッシュ
 
+## 顔検出モデルの比較
+
+このアプリに必要なのは「誰の顔か」ではなく「顔がどこか」です。現在は BlazeFace short-range を使っています。Vision WASM は推論の実行基盤で、BlazeFace はその上で動くモデルです。
+
+| 方式 | 分かるもの | 重さ | このアプリ向き |
+|---|---|---|---|
+| BlazeFace short-range（採用） | 顔の枠と、目・鼻・口・耳の数点 | モデル約225KB。128pxで推論 | 正面カメラの自撮りに最適 |
+| BlazeFace full-range | 同じだが、離れた顔も拾う | short-rangeより少し重い | 遠い顔を追うなら。今は不要 |
+| Face Landmarker | 478点の輪郭・目・口 | モデル約3.6MB。1回が十数〜数十ms | 精度は高いが、額の位置以外は使わない |
+| ブラウザ標準の `FaceDetector` | 顔の枠。端末によっては目・鼻・口 | WASMを載せなくて済む | Chrome/Safariとも安定提供ではない。iOSでは実質使えない |
+| face-api.js | 枠、または68点 | JavaScript実装で、BlazeFaceより遅いことが多い | 古い代替。今から選ぶ理由は薄い |
+| 顔認識（InsightFaceなど） | 同一人物かどうか | 検出より重い。顔写真の保存が要る | 頭の位置には不要。プライバシーにも合わない |
+
+BlazeFace の結果から使っているのは、両目の間隔と顔の幅です。そこから頭頂の位置と傾きを推定し、花と蝶を追従させています。横顔や遠い顔は落ちやすく、目の点は粗いので、花の位置は数ミリ単位では安定しません。
+
 ## ライセンス
 
 MIT License
